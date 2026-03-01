@@ -1,0 +1,502 @@
+[
+  {
+    "filename": "sample_0000.npz",
+    "snr_db": 4.5603308791320405,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0001.npz",
+    "snr_db": 9.691957545096303,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0002.npz",
+    "snr_db": 9.80335361419938,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0003.npz",
+    "snr_db": 13.87167888167973,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0004.npz",
+    "snr_db": 7.78413398637063,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0005.npz",
+    "snr_db": 14.116989793778497,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0006.npz",
+    "snr_db": 13.580885536314591,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0007.npz",
+    "snr_db": 8.139914307926505,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0008.npz",
+    "snr_db": 8.48347665313194,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0009.npz",
+    "snr_db": 5.360288543501188,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0010.npz",
+    "snr_db": 1.0150946488590717,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0011.npz",
+    "snr_db": 3.4595886865108256,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0012.npz",
+    "snr_db": 7.581468385046787,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0013.npz",
+    "snr_db": 2.7131756329125962,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0014.npz",
+    "snr_db": 3.0370762977523564,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0015.npz",
+    "snr_db": 8.443680091007273,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0016.npz",
+    "snr_db": 5.049729838245442,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0017.npz",
+    "snr_db": 8.41888929382501,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0018.npz",
+    "snr_db": 13.25401736379779,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0019.npz",
+    "snr_db": 7.950570149114697,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0020.npz",
+    "snr_db": 5.6569516329022544,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0021.npz",
+    "snr_db": 11.364024072489961,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0022.npz",
+    "snr_db": 13.126700643574404,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0023.npz",
+    "snr_db": 6.78618401969196,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0024.npz",
+    "snr_db": 5.180388340546545,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0025.npz",
+    "snr_db": 5.722283722725276,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0026.npz",
+    "snr_db": 12.881599780468505,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0027.npz",
+    "snr_db": 10.12069159018467,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0028.npz",
+    "snr_db": 3.944193217965016,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0029.npz",
+    "snr_db": 12.965206458160694,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0030.npz",
+    "snr_db": 7.01905394089096,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0031.npz",
+    "snr_db": 7.43246203189233,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0032.npz",
+    "snr_db": 11.1781827245651,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0033.npz",
+    "snr_db": 11.845855337889086,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0034.npz",
+    "snr_db": 1.6691341633321533,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0035.npz",
+    "snr_db": 11.178239458742382,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0036.npz",
+    "snr_db": 11.28692161820902,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0037.npz",
+    "snr_db": 7.3580808591832145,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0038.npz",
+    "snr_db": 0.8642910768803003,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0039.npz",
+    "snr_db": 0.37331209682195166,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0040.npz",
+    "snr_db": 7.459229939167042,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0041.npz",
+    "snr_db": 1.9561710068380727,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0042.npz",
+    "snr_db": 8.188330939849262,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0043.npz",
+    "snr_db": 9.278746285973865,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0044.npz",
+    "snr_db": 6.366516476652492,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0045.npz",
+    "snr_db": 3.1214942040300886,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0046.npz",
+    "snr_db": 11.761896737362623,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0047.npz",
+    "snr_db": 9.745360524808088,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0048.npz",
+    "snr_db": 13.66994086329809,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0049.npz",
+    "snr_db": 0.2745355932720578,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0050.npz",
+    "snr_db": 2.199531460825069,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0051.npz",
+    "snr_db": 1.6014399473852277,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0052.npz",
+    "snr_db": 7.341891608729883,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0053.npz",
+    "snr_db": 4.314626829081002,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0054.npz",
+    "snr_db": 4.066881260587749,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0055.npz",
+    "snr_db": 9.21480428409048,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0056.npz",
+    "snr_db": 8.370197572881082,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0057.npz",
+    "snr_db": 3.7027027652071762,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0058.npz",
+    "snr_db": 10.162062101879647,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0059.npz",
+    "snr_db": 8.337707779453993,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0060.npz",
+    "snr_db": 10.913218137905005,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0061.npz",
+    "snr_db": 6.996955582538761,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0062.npz",
+    "snr_db": 13.768804986237123,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0063.npz",
+    "snr_db": 3.849641692723117,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0064.npz",
+    "snr_db": 7.403148959770867,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0065.npz",
+    "snr_db": 8.449172585153411,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0066.npz",
+    "snr_db": 5.631479565822915,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0067.npz",
+    "snr_db": 5.253679263396887,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0068.npz",
+    "snr_db": 9.162504894631924,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0069.npz",
+    "snr_db": 10.040853558894037,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0070.npz",
+    "snr_db": 12.548246806076827,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0071.npz",
+    "snr_db": 12.66326134950904,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0072.npz",
+    "snr_db": 1.9445112848312718,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0073.npz",
+    "snr_db": 11.758234666625595,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0074.npz",
+    "snr_db": 11.087718614138995,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0075.npz",
+    "snr_db": 6.803128707684181,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0076.npz",
+    "snr_db": 2.2728254868476174,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0077.npz",
+    "snr_db": 7.7914693080536335,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0078.npz",
+    "snr_db": 13.196894265342587,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0079.npz",
+    "snr_db": 11.719930288698182,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0080.npz",
+    "snr_db": 6.844027028388741,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0081.npz",
+    "snr_db": 1.0895740526770585,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0082.npz",
+    "snr_db": 7.4660882958725825,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0083.npz",
+    "snr_db": 7.268072625322216,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0084.npz",
+    "snr_db": 1.4946399322025672,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0085.npz",
+    "snr_db": 0.12593019081005408,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0086.npz",
+    "snr_db": 13.917202984927117,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0087.npz",
+    "snr_db": 8.578020917579021,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0088.npz",
+    "snr_db": 9.418365627167471,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0089.npz",
+    "snr_db": 7.31677694621215,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0090.npz",
+    "snr_db": 13.62193965078425,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0091.npz",
+    "snr_db": 4.218670933264788,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0092.npz",
+    "snr_db": 2.3819550466450674,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0093.npz",
+    "snr_db": 8.10540195174745,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0094.npz",
+    "snr_db": 9.934447541083129,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0095.npz",
+    "snr_db": 9.299779335175801,
+    "noise_type": "white"
+  },
+  {
+    "filename": "sample_0096.npz",
+    "snr_db": 0.8547562567915606,
+    "noise_type": "street"
+  },
+  {
+    "filename": "sample_0097.npz",
+    "snr_db": 9.119250459766704,
+    "noise_type": "pink"
+  },
+  {
+    "filename": "sample_0098.npz",
+    "snr_db": 14.78766505161144,
+    "noise_type": "babble"
+  },
+  {
+    "filename": "sample_0099.npz",
+    "snr_db": 4.168826573828915,
+    "noise_type": "pink"
+  }
+]

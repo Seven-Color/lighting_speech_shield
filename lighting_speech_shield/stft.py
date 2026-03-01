@@ -22,35 +22,14 @@ class STFTProcessor:
         hop_length: Hop 长度 (默认 160, 对应 10ms)
         window: 窗函数 (默认 hann)
     """
-    def __init__(self, sample_rate=16000, n_fft=512, hop_length=160, window='hann'):
+    def __init__(self, sample_rate=16000, n_fft=512, hop_length=160):
         self.sample_rate = sample_rate
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.win_length = n_fft
         
-        # 创建 STFT 变换
-        self.stft = torchaudio.transforms.Spectrogram(
-            n_fft=n_fft,
-            hop_length=hop_length,
-            win_length=n_fft,
-            window_fn=torch.hann_window,
-            power=None,  # 返回复数
-            normalized=False,
-            center=True,
-            pad_mode='reflect'
-        )
-        
-        # ISTFT
-        self.istft = torchaudio.transforms.GriffinLim(
-            n_fft=n_fft,
-            hop_length=hop_length,
-            win_length=n_fft,
-            window_fn=torch.hann_window,
-            n_iter=32,
-            normalized=False,
-            center=True,
-            pad_mode='reflect'
-        )
+        # 窗函数
+        self.window = torch.hann_window(n_fft)
     
     def forward(self, audio, return_complex=True):
         """
@@ -68,63 +47,69 @@ class STFTProcessor:
         # 对每个通道做 STFT
         specs = []
         for c in range(C):
-            spec = self.stft(audio[:, c, :])  # (B, F, T)
+            # 使用 torch.stft
+            spec = torch.stft(
+                audio[:, c, :],
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                win_length=self.win_length,
+                window=self.window,
+                center=True,
+                pad_mode='reflect',
+                normalized=False,
+                return_complex=True
+            )  # (B, F, T)
             specs.append(spec)
         
         # 合并通道：(B, C, F, T)
         spec = torch.stack(specs, dim=1)
         
         if return_complex:
-            # 转换为 (B, C, T, F, 2) (实部，虚部) 格式
+            # 转换为 (B, T, F, C, 2) (实部，虚部) 格式
             spec_real = spec.real.unsqueeze(-1)
             spec_imag = spec.imag.unsqueeze(-1)
-            spec = torch.cat([spec_real, spec_imag], dim=-1)  # (B, C, T, F, 2)
-            spec = spec.permute(0, 2, 3, 1, 4)  # (B, T, F, C, 2)
+            spec = torch.cat([spec_real, spec_imag], dim=-1)  # (B, C, F, T, 2)
+            spec = spec.permute(0, 3, 2, 1, 4)  # (B, T, F, C, 2)
         
         return spec
     
-    def inverse(self, spec, target_audio=None):
+    def inverse(self, spec_complex, length=None):
         """
-        STFT → 音频 (使用 Griffin-Lim)
+        STFT → 音频 (使用 ISTFT)
         
         Args:
-            spec: 频谱 (B, C, F, T) 或 mask 处理后的频谱
-            target_audio: 原始音频用于相位重建
+            spec_complex: (B, C, F, T) 复数频谱或 (B, T, F, C, 2) 实/虚格式
+            length: 输出音频长度
         
         Returns:
-            audio: (B, 1, T) 降噪后的音频
+            audio: (B, C, T) 音频
         """
-        # 简化：假设输入是幅度谱，用原始相位
-        if spec.dim() == 5:
+        if spec_complex.dim() == 5:
             # (B, T, F, C, 2) → (B, C, F, T)
-            spec = spec.permute(0, 3, 2, 1, 4)
-            real = spec[..., 0]
-            imag = spec[..., 1]
-            spec_complex = torch.complex(real, imag)
-            spec_mag = torch.abs(spec_complex)
+            spec_complex = spec_complex.permute(0, 3, 2, 1, 4)
+            real = spec_complex[..., 0]
+            imag = spec_complex[..., 1]
+            spec = torch.complex(real, imag)
         else:
-            spec_mag = spec
+            spec = spec_complex
         
-        # 使用目标音频的相位（如果有）
-        if target_audio is not None:
-            target_spec = self.stft(target_audio[:, 0, :])
-            phase = torch.angle(target_spec)
-            spec_reconstructed = spec_mag * torch.exp(1j * phase)
-        else:
-            # 没有相位信息，用 Griffin-Lim
-            return self.istft(spec_mag)
+        B, C, F, T = spec.shape
         
-        # ISTFT
-        audio = torch.istft(
-            spec_reconstructed,
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            win_length=self.win_length,
-            window=torch.hann_window(self.win_length, device=spec_mag.device),
-            center=True
-        )
+        # 对每个通道做 ISTFT
+        audios = []
+        for c in range(C):
+            audio = torch.istft(
+                spec[:, c, :, :],
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                win_length=self.win_length,
+                window=self.window,
+                center=True,
+                length=length
+            )  # (B, T)
+            audios.append(audio)
         
-        return audio.unsqueeze(1)  # (B, 1, T)
+        return torch.stack(audios, dim=1)  # (B, C, T)
 
 
 def apply_mask(spec, mask, ref_channel=0):
@@ -163,11 +148,13 @@ if __name__ == "__main__":
     
     # 模拟 mask
     B, T, F, C, _ = spec.shape
-    fake_mask = torch.zeros(B, F, 1)  # 全 0 mask
+    fake_mask = torch.ones(B, F, 1)  # 全 1 mask
     
     # 应用 mask
     denoised = apply_mask(spec, fake_mask)
     
     # ISTFT
-    output = processor.inverse(denoised, target_audio=audio)
+    output = processor.inverse(denoised)
     print(f"Output: {output.shape}")
+    
+    print("[OK] STFT test passed!")

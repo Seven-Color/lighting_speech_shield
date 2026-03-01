@@ -199,7 +199,7 @@ def generate_dataset(output_dir, num_samples=100, duration=1.0):
     
     generator = SyntheticDataGenerator(sample_rate=16000, num_channels=3)
     
-    print(f"生成 {num_samples} 个样本...")
+    print(f"Generating {num_samples} samples...")
     
     metadata = []
     
@@ -223,14 +223,14 @@ def generate_dataset(output_dir, num_samples=100, duration=1.0):
         })
         
         if (i + 1) % 20 == 0:
-            print(f"  已生成 {i+1}/{num_samples} 个样本")
+            print(f"  Generated {i+1}/{num_samples} samples")
     
     # 保存元数据
     import json
     with open(output_dir / 'metadata.json', 'w') as f:
         json.dump(metadata, f, indent=2)
     
-    print(f"✅ 数据集已保存到 {output_dir}")
+    print(f"[OK] Dataset saved to {output_dir}")
     print(f"   样本数：{num_samples}")
     print(f"   格式：{generator.num_channels}通道, {int(duration*generator.sample_rate)}采样点/样本")
     
