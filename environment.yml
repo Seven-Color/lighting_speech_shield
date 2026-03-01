@@ -1,0 +1,16 @@
+name: lighting_speech_shield
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.10
+  - pytorch
+  - torchaudio
+  - numpy
+  - scipy
+  - matplotlib
+  - tqdm
+  - pip
+  - pip:
+    - librosa
+    - soundfile
