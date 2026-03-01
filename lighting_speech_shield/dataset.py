@@ -14,7 +14,7 @@ from .stft import STFTProcessor
 
 
 class SpeechNoiseDataset(Dataset):
-    """语音降噪数据集"""
+    """语音降噪数据集 - v2 复数 mask 版本"""
     
     def __init__(self, data_dir, n_fft=512, hop_length=160, num_frames=3):
         self.data_dir = Path(data_dir)
@@ -37,39 +37,49 @@ class SpeechNoiseDataset(Dataset):
         clean = torch.from_numpy(data['clean']).float()  # (C, T)
         noisy = torch.from_numpy(data['noisy']).float()  # (C, T)
         
-        # STFT 变换
-        clean_spec = self.stft_processor.forward(clean.unsqueeze(0), return_complex=True)  # (1, T, F, C, 2)
+        # STFT 变换: (1, T, F, C, 2)
+        clean_spec = self.stft_processor.forward(clean.unsqueeze(0), return_complex=True)
         noisy_spec = self.stft_processor.forward(noisy.unsqueeze(0), return_complex=True)
         
         # clean_spec: (1, T, F, C, 2)
-        # 计算幅度谱
-        clean_mag = torch.sqrt((clean_spec[..., 0] ** 2 + clean_spec[..., 1] ** 2))  # (1, T, F, C)
-        noisy_mag = torch.sqrt((noisy_spec[..., 0] ** 2 + noisy_spec[..., 1] ** 2))
         
-        # IBM: clean > noisy 则为 1
-        mask = (clean_mag > noisy_mag).float()  # (1, T, F, C)
+        # 计算复数 mask (只对参考通道)
+        # 复数 mask = clean_spec / noisy_spec
+        # 避免除零
+        noisy_mag = torch.sqrt(noisy_spec[..., 0]**2 + noisy_spec[..., 1]**2).clamp(min=1e-8)
         
-        # 只取参考通道 (第一个通道)
-        mask = mask[:, :, :, 0]  # (1, T, F)
+        # 复数 mask: (clean / |noisy|) * exp(1j * angle(noisy))
+        mask_real = clean_spec[..., 0] / noisy_mag
+        mask_imag = clean_spec[..., 1] / noisy_mag
         
-        # 对时间维度取平均
-        mask = mask.mean(dim=1, keepdim=True)  # (1, 1, F)
-        mask = mask.squeeze(1).transpose(0, 1)  # (F, 1)
+        # 限制 mask 幅度在 [0, 2]
+        mask_mag = torch.sqrt(mask_real**2 + mask_imag**2).clamp(max=2.0)
+        mask_angle = torch.atan2(mask_imag, mask_real)
         
-        # 模型输入：取前 num_frames 帧
-        input_spec = noisy_spec[:, :self.num_frames, :, :, :]  # (1, num_frames, F, C, 2)
-        input_spec = input_spec.permute(0, 2, 1, 3, 4)  # (1, F, num_frames, C, 2)
+        mask_real = mask_mag * torch.cos(mask_angle)
+        mask_imag = mask_mag * torch.sin(mask_angle)
         
-        return input_spec.squeeze(0), mask  # ((F, num_frames, C, 2), (F, 1))
+        # Stack 成复数: (1, T, F, C, 2)
+        complex_mask = torch.stack([mask_real, mask_imag], dim=-1)
+        
+        # 只取参考通道 (CH=0) 和目标帧数
+        mask = complex_mask[:, :self.num_frames, :, 0:1, :]  # (1, T, F, 1, 2)
+        mask = mask.squeeze(3).permute(0, 2, 1, 3)  # (1, F, T, 2)
+        
+        # 输入: noisy_spec 取目标帧
+        input_spec = noisy_spec[:, :self.num_frames, :, :, :]  # (1, T, F, C, 2)
+        input_spec = input_spec.permute(0, 2, 1, 3, 4)  # (1, F, T, C, 2)
+        
+        return input_spec.squeeze(0), mask.squeeze(0)  # ((F, T, C, 2), (F, T, 2))
 
 
 if __name__ == "__main__":
     # 测试数据集
-    dataset = SpeechNoiseDataset("data/synthetic")
+    dataset = SpeechNoiseDataset("data/synthetic", num_frames=3)
     print(f"Dataset size: {len(dataset)}")
     
     x, y = dataset[0]
-    print(f"Input shape: {x.shape}")
-    print(f"Mask shape: {y.shape}")
+    print(f"Input shape: {x.shape}")  # (F, T, C, 2) = (257, 3, 3, 2)
+    print(f"Mask shape: {y.shape}")   # (F, T, 2) = (257, 3, 2)
     print(f"Mask range: [{y.min():.4f}, {y.max():.4f}]")
     print("[OK] Dataset test passed!")
