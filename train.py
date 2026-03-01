@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 from tqdm import tqdm
 
-from lighting_speech_shield.model import LightingSpeechShield
+from lighting_speech_shield.model_v2 import LightingSpeechShieldV2
 from lighting_speech_shield.dataset import SpeechNoiseDataset
 
 
@@ -26,15 +26,12 @@ def train_model(data_dir, epochs=50, batch_size=16, lr=0.001, save_dir='checkpoi
     dataset = SpeechNoiseDataset(data_dir)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     
-    # 模型
-    model = LightingSpeechShield(
-        num_freq_bins=257,
-        num_frames=3,
-        num_channels=3,
-        base_channels=32,
-        num_layers=4,
-        num_heads=4,
-        future_frames=2
+    # 模型 (v2)
+    model = LightingSpeechShieldV2(
+        num_freq_in=257,
+        num_freq_compressed=64,
+        input_dim=18,
+        base_channels=64
     ).to(device)
     
     # 损失函数
