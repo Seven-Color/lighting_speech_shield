@@ -1,7 +1,8 @@
 """
-数据集模块
+数据集模块 - v2 100帧版本
 
-语音降噪数据集加载
+输入: (B, F=257, T=100, CH=3, 2) -> 合并实虚部 -> (B, F=257, T=100, CH=6)
+输出: (B, F=257, T=100, 2) - 复数mask
 """
 
 import torch
@@ -14,16 +15,13 @@ from .stft import STFTProcessor
 
 
 class SpeechNoiseDataset(Dataset):
-    """语音降噪数据集 - v2 复数 mask 版本"""
-    
-    def __init__(self, data_dir, n_fft=512, hop_length=160, num_frames=3):
+    def __init__(self, data_dir, n_fft=512, hop_length=160, num_frames=100):
         self.data_dir = Path(data_dir)
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.num_frames = num_frames
         self.stft_processor = STFTProcessor(16000, n_fft, hop_length)
         
-        # 加载元数据
         with open(self.data_dir / 'metadata.json') as f:
             self.metadata = json.load(f)
     
@@ -37,49 +35,52 @@ class SpeechNoiseDataset(Dataset):
         clean = torch.from_numpy(data['clean']).float()  # (C, T)
         noisy = torch.from_numpy(data['noisy']).float()  # (C, T)
         
-        # STFT 变换: (1, T, F, C, 2)
+        # STFT: (1, T, F, C, 2)
         clean_spec = self.stft_processor.forward(clean.unsqueeze(0), return_complex=True)
         noisy_spec = self.stft_processor.forward(noisy.unsqueeze(0), return_complex=True)
         
-        # clean_spec: (1, T, F, C, 2)
+        # 扩展到目标帧数
+        T_orig = clean_spec.shape[1]
+        while clean_spec.shape[1] < self.num_frames:
+            clean_spec = torch.cat([clean_spec, clean_spec], dim=1)
+            noisy_spec = torch.cat([noisy_spec, noisy_spec], dim=1)
         
-        # 计算复数 mask (只对参考通道)
-        # 复数 mask = clean_spec / noisy_spec
-        # 避免除零
-        noisy_mag = torch.sqrt(noisy_spec[..., 0]**2 + noisy_spec[..., 1]**2).clamp(min=1e-8)
+        # 裁剪
+        clean_spec = clean_spec[:, :self.num_frames, :, :, :]
+        noisy_spec = noisy_spec[:, :self.num_frames, :, :, :]
         
-        # 复数 mask: (clean / |noisy|) * exp(1j * angle(noisy))
-        mask_real = clean_spec[..., 0] / noisy_mag
-        mask_imag = clean_spec[..., 1] / noisy_mag
+        # 参考通道 C=0
+        noisy_c0 = noisy_spec[:, :, :, 0, :]  # (1, T, F, 2)
+        clean_c0 = clean_spec[:, :, :, 0, :]  # (1, T, F, 2)
         
-        # 限制 mask 幅度在 [0, 2]
+        # 计算复数mask
+        noisy_mag = torch.sqrt(noisy_c0[..., 0]**2 + noisy_c0[..., 1]**2).clamp(min=1e-8)
+        
+        mask_real = clean_c0[..., 0] / noisy_mag
+        mask_imag = clean_c0[..., 1] / noisy_mag
+        
+        # 限制幅度
         mask_mag = torch.sqrt(mask_real**2 + mask_imag**2).clamp(max=2.0)
         mask_angle = torch.atan2(mask_imag, mask_real)
-        
         mask_real = mask_mag * torch.cos(mask_angle)
         mask_imag = mask_mag * torch.sin(mask_angle)
         
-        # Stack 成复数: (1, T, F, C, 2)
-        complex_mask = torch.stack([mask_real, mask_imag], dim=-1)
+        # 合并实虚部: (1, T, F, 2) -> (F, T, 2)
+        mask = torch.stack([mask_real.squeeze(0), mask_imag.squeeze(0)], dim=-1)  # (T, F, 2)
+        mask = mask.permute(1, 0, 2)  # (F, T, 2)
         
-        # 只取参考通道 (CH=0) 和目标帧数
-        mask = complex_mask[:, :self.num_frames, :, 0:1, :]  # (1, T, F, 1, 2)
-        mask = mask.squeeze(3).permute(0, 2, 1, 3)  # (1, F, T, 2)
+        # 输入: (1, T, F, C, 2) -> 合并实虚部 -> (F, T, 6)
+        noisy_input = noisy_spec.squeeze(0)  # (T, F, C, 2)
+        noisy_input = noisy_input.permute(1, 0, 2, 3)  # (F, T, C, 2)
+        noisy_input = noisy_input.reshape(257, 100, 6)  # (F, T, 6)
         
-        # 输入: noisy_spec 取目标帧
-        input_spec = noisy_spec[:, :self.num_frames, :, :, :]  # (1, T, F, C, 2)
-        input_spec = input_spec.permute(0, 2, 1, 3, 4)  # (1, F, T, C, 2)
-        
-        return input_spec.squeeze(0), mask.squeeze(0)  # ((F, T, C, 2), (F, T, 2))
+        return noisy_input, mask
 
 
 if __name__ == "__main__":
-    # 测试数据集
-    dataset = SpeechNoiseDataset("data/synthetic", num_frames=3)
-    print(f"Dataset size: {len(dataset)}")
-    
+    dataset = SpeechNoiseDataset("data/synthetic", num_frames=100)
     x, y = dataset[0]
-    print(f"Input shape: {x.shape}")  # (F, T, C, 2) = (257, 3, 3, 2)
-    print(f"Mask shape: {y.shape}")   # (F, T, 2) = (257, 3, 2)
-    print(f"Mask range: [{y.min():.4f}, {y.max():.4f}]")
-    print("[OK] Dataset test passed!")
+    print(f"输入: {x.shape} (F,T,6)")
+    print(f"Mask: {y.shape} (F,T,2)")
+    print(f"Mask: [{y.min():.4f}, {y.max():.4f}]")
+    print("[OK]")

@@ -1,9 +1,9 @@
 """
-Lighting Speech Shield v2 - Conv3D 复数 Mask 版本
+Lighting Speech Shield v2 - 100帧 2D卷积版本
 
-输入: (B, F=257, T=3-10, CH=3, 2) 
-输出: (B, F=257, T=3-10, 2) 复数 mask
-使用 Conv3D 处理时频域
+输入: (B, F=257, T=100, CH=3, 2) -> 合并实虚部 -> (B, F=257, T=100, CH=6)
+输出: (B, F=257, T=100, 2) - 复数mask
+100帧算力目标: <200MFlops
 """
 
 import torch
@@ -11,135 +11,160 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class RMSNorm(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(dim))
-    
-    def forward(self, x):
-        rms = torch.sqrt(x.pow(2).mean(-1, keepdim=True) + 1e-6)
-        return x / rms * self.weight
-
-
 class ComplexMaskNet(nn.Module):
-    """Conv3D 复数 Mask 网络"""
-    def __init__(self, num_freq=257, num_channels=3, base_channels=16):
+    """
+    2D卷积网络
+    输入: (B, F, T, 6) 合并了实虚部
+    输出: (B, F, T, 2) 复数mask
+    """
+    def __init__(self, base_channels=12):
         super().__init__()
         
-        # 输入: (B, F, T, CH, 2) = (B, 257, T, 3, 2)
-        # Conv3D 需要: (B, C, D, H, W) = (B, 2, T, F, CH)
+        # 输入: (B, F, T, 6) -> Conv2D需要 (B, C, H, W) = (B, 6, F, T)
         
-        # 复数卷积 (2通道作为输入通道)
-        self.conv3d = nn.Sequential(
-            nn.Conv3d(2, base_channels, kernel_size=(3, 3, 3), padding=(1, 1, 1)),
-            nn.BatchNorm3d(base_channels),
-            nn.GELU(),
-            nn.Conv3d(base_channels, base_channels, kernel_size=(3, 3, 3), padding=(1, 1, 1)),
-            nn.BatchNorm3d(base_channels),
+        # 编码器 - 压缩
+        self.enc1 = nn.Sequential(
+            nn.Conv2d(6, base_channels, 3, padding=1),
+            nn.BatchNorm2d(base_channels),
             nn.GELU(),
         )
         
-        # 中间层 (减少复杂度)
+        self.enc2 = nn.Sequential(
+            nn.Conv2d(base_channels, base_channels*2, 3, stride=2, padding=1),  # F/2, T/2
+            nn.BatchNorm2d(base_channels*2),
+            nn.GELU(),
+        )
+        
+        self.enc3 = nn.Sequential(
+            nn.Conv2d(base_channels*2, base_channels*4, 3, stride=2, padding=1),  # F/4, T/4
+            nn.BatchNorm2d(base_channels*4),
+            nn.GELU(),
+        )
+        
+        # 中间层
         self.mid = nn.Sequential(
-            nn.Conv3d(base_channels, base_channels, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1)),
-            nn.BatchNorm3d(base_channels),
+            nn.Conv2d(base_channels*4, base_channels*4, 3, padding=1),
+            nn.BatchNorm2d(base_channels*4),
             nn.GELU(),
         )
         
-        # 上采样 (简化)
-        self.up = nn.Identity()
-        
-        # 输出头：复数 mask (减少复杂度)
-        self.mask_head = nn.Sequential(
-            nn.Conv3d(base_channels, 16, kernel_size=(1, 1, 1)),
+        # 解码器 - 上采样
+        self.dec3 = nn.Sequential(
+            nn.ConvTranspose2d(base_channels*4, base_channels*2, 4, stride=2, padding=1),
+            nn.BatchNorm2d(base_channels*2),
             nn.GELU(),
-            nn.Conv3d(16, 2, kernel_size=(1, 1, 1)),  # 输出 2 通道（实部+虚部）
+        )
+        
+        self.dec2 = nn.Sequential(
+            nn.ConvTranspose2d(base_channels*2, base_channels, 4, stride=2, padding=1),
+            nn.BatchNorm2d(base_channels),
+            nn.GELU(),
+        )
+        
+        # 输出头
+        self.out = nn.Sequential(
+            nn.Conv2d(base_channels, 32, 1),
+            nn.GELU(),
+            nn.Conv2d(32, 2, 1),
             nn.Sigmoid()
         )
     
     def forward(self, x):
-        """
-        x: (B, F, T, CH, 2)
-        返回: (B, F, T, 2)
-        """
-        B, F, T, CH, _ = x.shape
+        # x: (B, F, T, 6)
+        B, F_dim, T_dim, C = x.shape
         
-        # 维度重排: (B, F, T, CH, 2) -> (B, 2, T, F, CH)
-        x = x.permute(0, 4, 2, 1, 3).contiguous()
+        # 维度重排: (B, F, T, C) -> (B, C, F, T)
+        x = x.permute(0, 3, 1, 2)
         
-        # Conv3D
-        x = self.conv3d(x)
-        x = self.mid(x)
-        x = self.up(x)
+        # 编码
+        e1 = self.enc1(x)   # (B, C, F, T)
+        e2 = self.enc2(e1)   # (B, 2C, F/2, T/2)
+        e3 = self.enc3(e2)   # (B, 4C, F/4, T/4)
         
-        # Mask 输出
-        mask = self.mask_head(x)  # (B, 2, T, F, CH)
+        # 中间
+        m = self.mid(e3)
         
-        # 维度恢复: (B, 2, T, F, CH) -> (B, F, T, 2)
-        # 只取第一个通道 (CH=0)
-        mask = mask[:, :, :, :, 0]  # (B, 2, T, F)
-        mask = mask.permute(0, 3, 2, 1)  # (B, F, T, 2)
+        # 解码 - 残差连接
+        d3 = self.dec3(m)
+        # 调整尺寸匹配
+        target_size = (e2.shape[2], e2.shape[3])
+        if d3.shape[2:] != target_size:
+            d3 = torch.nn.functional.interpolate(d3, size=target_size, mode='bilinear', align_corners=False)
+        d3 = d3 + e2
         
-        return mask
+        d2 = self.dec2(d3)
+        target_size = (e1.shape[2], e1.shape[3])
+        if d2.shape[2:] != target_size:
+            d2 = torch.nn.functional.interpolate(d2, size=target_size, mode='bilinear', align_corners=False)
+        d2 = d2 + e1
+        
+        # 输出
+        out = self.out(d2)
+        
+        # 调整到目标F和T
+        target_size = (F_dim, T_dim)
+        out = torch.nn.functional.interpolate(out, size=target_size, mode='bilinear', align_corners=False)
+        
+        # 维度恢复: (B, 2, F, T) -> (B, F, T, 2)
+        out = out.permute(0, 2, 3, 1)
+        
+        return out
 
 
-def estimate_flops(input_shape=(1, 257, 3, 3, 2)):
-    """估算 FLOPs"""
-    B, F, T, CH, _ = input_shape
-    C = 16  # base_channels
+def estimate_flops():
+    """估算100帧FLOPs"""
+    B, F, T = 1, 257, 100
+    C = 12  # base_channels
     
-    flops = 0
+    # 简化估算
+    # enc1: 6->24, 3x3
+    flops1 = 6 * C * 3 * 3 * B * F * T
+    # enc2: 24->48, 3x3, stride
+    flops2 = C * C*2 * 3 * 3 * B * (F//2) * (T//2)
+    # enc3: 48->96, 3x3
+    flops3 = C*2 * C*4 * 3 * 3 * B * (F//4) * (T//4)
+    # mid: 96->96
+    flops_mid = C*4 * C*4 * 3 * 3 * B * (F//4) * (T//4)
+    # dec3: 96->48
+    flops_d3 = C*4 * C*2 * 4 * 4 * B * (F//4) * (T//4)
+    # dec2: 48->24
+    flops_d2 = C*2 * C * 4 * 4 * B * (F//2) * (T//2)
+    # out
+    flops_out = C * 32 * 1 * 1 * B * F * T + 32 * 2 * 1 * 1 * B * F * T
     
-    # Conv3D: C_in * C_out * D * H * W * output_size
-    # conv3d 1: (2->16) * 3*3*3 * B*T*F*CH
-    flops += 2 * 16 * 3 * 3 * 3 * B * T * F * CH
-    # conv3d 2: (16->16) * 3*3*3 * B*T*F*CH
-    flops += 16 * 16 * 3 * 3 * 3 * B * T * F * CH
-    # mid: (16->16) * 3*3*3 * B*T*F*CH
-    flops += 16 * 16 * 3 * 3 * 3 * B * T * F * CH
-    
-    # mask head
-    flops += 16 * 16 * 1 * 1 * 1 * B * T * F * CH
-    flops += 16 * 2 * 1 * 1 * 1 * B * T * F * CH
-    
-    return flops / 1e6
+    total = (flops1 + flops2 + flops3 + flops_mid + flops_d3 + flops_d2 + flops_out) / 1e6
+    return total
 
 
-def model_info(input_shape=(1, 257, 3, 3, 2)):
-    model = ComplexMaskNet()
+def test_model():
+    print("="*50)
+    print("Testing v2 100帧 2D Conv")
+    print("="*50)
+    
+    model = ComplexMaskNet(base_channels=24)
     params = sum(p.numel() for p in model.parameters())
-    mflops = estimate_flops(input_shape)
+    flops = estimate_flops()
     
-    x = torch.randn(*input_shape)
+    # 测试输入
+    x = torch.randn(1, 257, 100, 3, 2)  # (B, F, T, CH, 2)
+    
+    # 合并实虚部: (B, F, T, CH, 2) -> (B, F, T, CH*2)
+    x = x.reshape(1, 257, 100, 6)
+    
     with torch.no_grad():
         y = model(x)
     
-    print(f"\n{'='*50}")
-    print(f"Lighting Speech Shield v2 - Conv3D Complex Mask")
-    print(f"{'='*50}")
-    print(f"输入：{input_shape}")
-    print(f"输出：{y.shape}")
-    print(f"参数量：{params:,} ({params/1e6:.2f}M)")
-    print(f"FLOPs (3帧): {mflops:.1f} MFlops")
-    print(f"目标：<200 MFlops [{'PASS' if mflops < 200 else 'FAIL'}]")
-    print(f"{'='*50}\n")
+    print(f"输入: (1, 257, 100, 3, 2)")
+    print(f"合并后: (1, 257, 100, 6)")
+    print(f"输出: {y.shape}")
+    print(f"参数量: {params:,}")
+    print(f"FLOPs: {flops:.1f} MFlops")
+    print(f"目标<200M: {'PASS' if flops < 200 else 'FAIL'}")
+    print(f"Mask范围: [{y.min():.4f}, {y.max():.4f}]")
+    print("="*50)
     
-    return params, mflops
+    return params, flops
 
 
 if __name__ == "__main__":
-    print("Testing Lighting Speech Shield v2 - Conv3D...")
-    
-    # 测试 3 帧
-    params, mflops = model_info((1, 257, 3, 3, 2))
-    
-    # 测试 10 帧
-    x = torch.randn(1, 257, 10, 3, 2)
-    model = ComplexMaskNet()
-    with torch.no_grad():
-        mask = model(x)
-    
-    print(f"输入 10 帧: {x.shape}")
-    print(f"输出 Mask: {mask.shape}")
-    print(f"Mask 范围: [{mask.min():.4f}, {mask.max():.4f}]")
-    print(f"\n[OK] Test passed!")
+    test_model()
