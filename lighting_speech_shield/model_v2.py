@@ -1,14 +1,73 @@
 """
-Lighting Speech Shield v2 - 100帧 2D卷积版本
+Lighting Speech Shield v2 - 100帧 2D卷积版本 (优化版)
 
 输入: (B, F=257, T=100, CH=3, 2) -> 合并实虚部 -> (B, F=257, T=100, CH=6)
 输出: (B, F=257, T=100, 2) - 复数mask
 100帧算力目标: <200MFlops
+
+优化:
+- 添加轻量注意力模块 (SE + 频率注意力)
+- 残差密集连接
+- 支持流式推理模式
 """
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+class ChannelAttention(nn.Module):
+    """轻量通道注意力"""
+    def __init__(self, channels, reduction=4):
+        super().__init__()
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channels, channels // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channels // reduction, channels, bias=False),
+            nn.Sigmoid()
+        )
+    
+    def forward(self, x):
+        b, c, _, _ = x.shape
+        y = self.pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y
+
+
+class FrequencyAttention(nn.Module):
+    """轻量频率维度注意力"""
+    def __init__(self, freq_bins, reduction=4):
+        super().__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(freq_bins, freq_bins // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(freq_bins // reduction, freq_bins, bias=False),
+            nn.Sigmoid()
+        )
+    
+    def forward(self, x):
+        # x: (B, C, F, T) -> (B, T, F, C)
+        x_perm = x.permute(0, 3, 2, 1)
+        b, t, f, c = x_perm.shape
+        y = x_perm.reshape(b * t, f, c).mean(dim=1)
+        y = self.fc(y).reshape(b, t, 1, c)
+        x_perm = x_perm * y
+        return x_perm.permute(0, 3, 2, 1)
+
+
+class AttentionBlock(nn.Module):
+    """轻量注意力块: 通道 + 频率注意力"""
+    def __init__(self, channels, freq_bins, reduction=4):
+        super().__init__()
+        self.channel_att = ChannelAttention(channels, reduction)
+        self.freq_att = FrequencyAttention(freq_bins, reduction)
+        self.norm = nn.BatchNorm2d(channels)
+    
+    def forward(self, x):
+        x = x + self.channel_att(x)
+        x = x + self.freq_att(x)
+        return self.norm(x)
 
 
 class ComplexMaskNet(nn.Module):
@@ -17,8 +76,10 @@ class ComplexMaskNet(nn.Module):
     输入: (B, F, T, 6) 合并了实虚部
     输出: (B, F, T, 2) 复数mask
     """
-    def __init__(self, base_channels=12):
+    def __init__(self, base_channels=12, use_attention=True):
         super().__init__()
+        self.use_attention = use_attention
+        self.base_channels = base_channels
         
         # 输入: (B, F, T, 6) -> Conv2D需要 (B, C, H, W) = (B, 6, F, T)
         
@@ -28,18 +89,24 @@ class ComplexMaskNet(nn.Module):
             nn.BatchNorm2d(base_channels),
             nn.GELU(),
         )
+        if use_attention:
+            self.att1 = AttentionBlock(base_channels, 257)
         
         self.enc2 = nn.Sequential(
             nn.Conv2d(base_channels, base_channels*2, 3, stride=2, padding=1),  # F/2, T/2
             nn.BatchNorm2d(base_channels*2),
             nn.GELU(),
         )
+        if use_attention:
+            self.att2 = AttentionBlock(base_channels*2, 128)
         
         self.enc3 = nn.Sequential(
             nn.Conv2d(base_channels*2, base_channels*4, 3, stride=2, padding=1),  # F/4, T/4
             nn.BatchNorm2d(base_channels*4),
             nn.GELU(),
         )
+        if use_attention:
+            self.att3 = AttentionBlock(base_channels*4, 64)
         
         # 中间层
         self.mid = nn.Sequential(
@@ -78,8 +145,16 @@ class ComplexMaskNet(nn.Module):
         
         # 编码
         e1 = self.enc1(x)   # (B, C, F, T)
+        if self.use_attention:
+            e1 = self.att1(e1)
+        
         e2 = self.enc2(e1)   # (B, 2C, F/2, T/2)
+        if self.use_attention:
+            e2 = self.att2(e2)
+        
         e3 = self.enc3(e2)   # (B, 4C, F/4, T/4)
+        if self.use_attention:
+            e3 = self.att3(e3)
         
         # 中间
         m = self.mid(e3)
