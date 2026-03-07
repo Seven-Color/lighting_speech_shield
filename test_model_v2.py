@@ -44,7 +44,7 @@ def test_model():
     print("\n[3] FLOPs 估算:")
     flops = estimate_flops()
     print(f"  FLOPs: {flops:.1f} MFlops")
-    print(f"  目标<200M: {'PASS ✅' if flops < 200 else 'FAIL ⚠️'}")
+    print(f"  目标<200M: {'PASS' if flops < 200 else 'FAIL'}")
     
     print("\n" + "=" * 50)
     print("Model test PASSED!")

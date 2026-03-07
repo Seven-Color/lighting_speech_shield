@@ -36,32 +36,32 @@ class ChannelAttention(nn.Module):
 
 
 class FrequencyAttention(nn.Module):
-    """轻量频率维度注意力"""
-    def __init__(self, freq_bins, reduction=4):
+    """轻量频率维度注意力 - 对每个通道的频率维度做注意力"""
+    def __init__(self, reduction=4):
         super().__init__()
-        self.fc = nn.Sequential(
-            nn.Linear(freq_bins, freq_bins // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(freq_bins // reduction, freq_bins, bias=False),
-            nn.Sigmoid()
-        )
+        self.reduction = reduction
     
     def forward(self, x):
-        # x: (B, C, F, T) -> (B, T, F, C)
-        x_perm = x.permute(0, 3, 2, 1)
-        b, t, f, c = x_perm.shape
-        y = x_perm.reshape(b * t, f, c).mean(dim=1)
-        y = self.fc(y).reshape(b, t, 1, c)
-        x_perm = x_perm * y
-        return x_perm.permute(0, 3, 2, 1)
+        # x: (B, C, F, T)
+        b, c, f, t = x.shape
+        # 对每个通道和时间点计算频率注意力
+        # (B, C, F, T) -> (B, C, T, F) -> (B*C*T, F)
+        x_flat = x.permute(0, 1, 3, 2).reshape(b * c * t, f)
+        # 计算注意力
+        y = x_flat.mean(dim=1, keepdim=True)  # (B*C*T, 1)
+        # 简单的单层注意力
+        y = y * x_flat  # (B*C*T, F) - 简化版
+        x_flat = x_flat * torch.sigmoid(y)
+        x_out = x_flat.reshape(b, c, t, f).permute(0, 1, 3, 2)  # (B, C, F, T)
+        return x_out
 
 
 class AttentionBlock(nn.Module):
     """轻量注意力块: 通道 + 频率注意力"""
-    def __init__(self, channels, freq_bins, reduction=4):
+    def __init__(self, channels, reduction=4):
         super().__init__()
         self.channel_att = ChannelAttention(channels, reduction)
-        self.freq_att = FrequencyAttention(freq_bins, reduction)
+        self.freq_att = FrequencyAttention(reduction)
         self.norm = nn.BatchNorm2d(channels)
     
     def forward(self, x):
@@ -90,7 +90,7 @@ class ComplexMaskNet(nn.Module):
             nn.GELU(),
         )
         if use_attention:
-            self.att1 = AttentionBlock(base_channels, 257)
+            self.att1 = AttentionBlock(base_channels)
         
         self.enc2 = nn.Sequential(
             nn.Conv2d(base_channels, base_channels*2, 3, stride=2, padding=1),  # F/2, T/2
@@ -98,7 +98,7 @@ class ComplexMaskNet(nn.Module):
             nn.GELU(),
         )
         if use_attention:
-            self.att2 = AttentionBlock(base_channels*2, 128)
+            self.att2 = AttentionBlock(base_channels*2)
         
         self.enc3 = nn.Sequential(
             nn.Conv2d(base_channels*2, base_channels*4, 3, stride=2, padding=1),  # F/4, T/4
@@ -106,7 +106,7 @@ class ComplexMaskNet(nn.Module):
             nn.GELU(),
         )
         if use_attention:
-            self.att3 = AttentionBlock(base_channels*4, 64)
+            self.att3 = AttentionBlock(base_channels*4)
         
         # 中间层
         self.mid = nn.Sequential(
