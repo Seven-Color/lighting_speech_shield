@@ -1,10 +1,10 @@
 # Lighting Speech Shield 🛡️
 
-轻量级实时语音降噪模型，基于卷积和注意力机制。
+轻量级实时语音降噪模型，基于卷积、注意力机制和DenseNet密集连接。
 
 ## 特性
 
-- ✅ 仅使用卷积 + 注意力机制
+- ✅ 卷积 + 注意力机制 + DeNet (DenseNet) 密集连接
 - ✅ 流式处理（延迟 10-30ms）
 - ✅ 低算力（<200 MFlops）
 - ✅ 3 通道输入，频域 mask 输出
@@ -21,7 +21,7 @@
 | FFT 大小 | 512 |
 | Hop 长度 | 160 (10ms) |
 | 上下文帧 | 100 帧 |
-| 算力 | ~200 MFlops |
+| 算力 | ~166 MFlops |
 
 ## 安装
 
@@ -47,6 +47,9 @@ python infer.py --input test.wav --output denoised.wav --streaming
 
 # 测试模型
 python test_model_v2.py
+
+# 测试DeNet版本
+python lighting_speech_shield/model_v3.py
 ```
 
 ## 训练参数
@@ -65,10 +68,18 @@ python train.py --no_amp
 ## 模型架构
 
 ```
-输入 (3 通道) → STFT → 复数频谱 → Backbone(Conv+Attention) → Mask → 降噪输出
+输入 (3 通道) → STFT → 复数频谱 → Backbone(Conv+DenseNet+Attention) → Mask → 降噪输出
 ```
 
-### 优化版本 v2
+### 版本历史
+
+#### v3 (DeNet版本)
+- 添加 DeNet (DenseNet) 密集连接机制
+- 增强特征复用和梯度流动
+- 2个DenseBlock + 注意力模块
+- 参数量: ~12K, 算力: ~166 MFlops
+
+#### v2
 - 2D U-Net 结构
 - 轻量通道注意力 (SE-like)
 - 频率维度注意力
